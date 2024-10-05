@@ -26,22 +26,31 @@ uncomment one of the following lines depending on which communication method you
 // See this page for information about how to set up a robot's drivetrain using the JMotor library
 // https://github.com/joshua-8/JMotor/wiki/How-to-set-up-a-drivetrain
 
+JMotorDriverEsp32Servo servo1Driver = JMotorDriverEsp32Servo(port1);
+JServoController sC = JServoController(servo1Driver, false, INFINITY, INFINITY, INFINITY );
+float servo1Val = 0;
 
 void Enabled()
 {
     // code to run while enabled, put your main code here
-
+    if (servo1Val > 180) servo1Val = 0;
+    else servo1Val += 15;
+    sC.setAngleImmediate(servo1Val);
+    //servo1Driver.enable();
+    
 }
 
 void Enable()
 {
     // turn on outputs
-
+    sC.enable();
+    sC.setAngleImmediate(0);
 }
 
 void Disable()
 {
     // turn off outputs
+    sC.disable();
 
 }
 
@@ -55,8 +64,8 @@ void Always()
 {
     // always runs if void loop is running, JMotor run() functions should be put here
     // (but only the "top level", for example if you call drivetrainController.run() you shouldn't also call leftMotorController.run())
-
-    delay(1);
+    sC.run();
+    delay(100);
 }
 
 #if RCM_COMM_METHOD == RCM_COMM_EWD
@@ -69,6 +78,7 @@ void WifiDataToParse()
 void WifiDataToSend()
 {
     EWD::sendFl(voltageComp.getSupplyVoltage());
+    EWD::sendFl(servo1Val);
     // add data to send here: (EWD::sendBl(), EWD::sendBy(), EWD::sendIn(), EWD::sendFl())(boolean, byte, int, float)
 
 }
@@ -76,8 +86,8 @@ void WifiDataToSend()
 void configWifi()
 {
     EWD::mode = EWD::Mode::connectToNetwork;
-    EWD::routerName = "router";
-    EWD::routerPassword = "password";
+    EWD::routerName = "HOME-8722";
+    EWD::routerPassword = "LPUndergroundX1";
     EWD::routerPort = 25210;
 
     // EWD::mode = EWD::Mode::createAP;
