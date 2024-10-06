@@ -18,6 +18,9 @@ uncomment one of the following lines depending on which communication method you
 #define RCM_COMM_METHOD RCM_COMM_EWD // use the normal communication method for RCM robots
 // #define RCM_COMM_METHOD RCM_COMM_ROS // use the ROS communication method
 
+#define WIFI_MODE_JOIN 0        //join existing network
+#define WIFI_MODE_CREATE 1      //create new access point
+
 #include "rcm.h" //defines pins
 
 // set up motors and anything else you need here
@@ -33,7 +36,7 @@ float servo1Val = 0;
 void Enabled()
 {
     // code to run while enabled, put your main code here
-    if (servo1Val > 180) servo1Val = 0;
+    if (servo1Val > 180) servo1Val = -180;
     else servo1Val += 15;
     sC.setAngleImmediate(servo1Val);
     //servo1Driver.enable();
@@ -65,6 +68,11 @@ void Always()
     // always runs if void loop is running, JMotor run() functions should be put here
     // (but only the "top level", for example if you call drivetrainController.run() you shouldn't also call leftMotorController.run())
     sC.run();
+    /*#ifdef WIFI_MODE
+    Serial.printf("WIFI_MODE: %d\n", WIFI_MODE);
+    #else
+    Serial.printf("WIFI_MODE UNDEFINED");
+    #endif*/
     delay(100);
 }
 
@@ -85,15 +93,24 @@ void WifiDataToSend()
 
 void configWifi()
 {
+    #ifdef WIFI_MODE
+    Serial.printf("WIFI_MODE: %d\n", WIFI_MODE);
+    #if WIFI_MODE == WIFI_MODE_JOIN
+    Serial.printf("JOINING WIFI NETWORK\n");
     EWD::mode = EWD::Mode::connectToNetwork;
     EWD::routerName = "HOME-8722";
     EWD::routerPassword = "LPUndergroundX1";
     EWD::routerPort = 25210;
-
-    // EWD::mode = EWD::Mode::createAP;
-    // EWD::APName = "rcm0";
-    // EWD::APPassword = "rcmPassword";
-    // EWD::APPort = 25210;
+    #elif WIFI_MODE == WIFI_MODE_CREATE
+    Serial.printf("CREATING WIFI NETWORK\n");
+    EWD::mode = EWD::Mode::createAP;
+    EWD::APName = "rcm0";
+    EWD::APPassword = "rcmPassword";
+    EWD::APPort = 25210;
+    #else
+    Serial.printf("WIFI_MODE UNDEFINED");
+    #endif
+    #endif
 }
 #elif RCM_COMM_METHOD == RCM_COMM_ROS ////////////// ignore everything below this line unless you're using ROS mode/////////////////////////////////////////////
 void ROSWifiSettings()
