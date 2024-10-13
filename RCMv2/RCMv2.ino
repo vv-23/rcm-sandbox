@@ -6,9 +6,9 @@
 uncomment one of the following lines depending on which hardware you have
 Remember to also choose the "environment" for your microcontroller in PlatformIO
 */
-#define RCM_HARDWARE_VERSION RCM_ORIGINAL // versions 1, 2, 3, and 3.1 of the original RCM hardware // https://github.com/RCMgames/RCM_hardware_documentation_and_user_guide
+// #define RCM_HARDWARE_VERSION RCM_ORIGINAL // versions 1, 2, 3, and 3.1 of the original RCM hardware // https://github.com/RCMgames/RCM_hardware_documentation_and_user_guide
 // #define RCM_HARDWARE_VERSION RCM_4_V1 // version 1 of the RCM 4 // https://github.com/RCMgames/RCM-Hardware-V4
-// #define RCM_HARDWARE_VERSION RCM_BYTE_V2 // version 2 of the RCM BYTE // https://github.com/RCMgames/RCM-Hardware-BYTE
+#define RCM_HARDWARE_VERSION RCM_BYTE_V2 // version 2 of the RCM BYTE // https://github.com/RCMgames/RCM-Hardware-BYTE
 // #define RCM_HARDWARE_VERSION RCM_NIBBLE_V1 // version 1 of the RCM Nibble // https://github.com/RCMgames/RCM-Hardware-Nibble
 // #define RCM_HARDWARE_VERSION RCM_D1_V1 // version 1 of the RCM D1 // https://github.com/RCMgames/RCM-Hardware-D1
 
@@ -21,6 +21,14 @@ uncomment one of the following lines depending on which communication method you
 #define WIFI_MODE_JOIN 0        //join existing network
 #define WIFI_MODE_CREATE 1      //create new access point
 
+#define _STRINGIZE(x) #x
+#define STRINGIZE(x) _STRINGIZE(x)
+
+#include "WiFi.h"
+#include "ESPAsyncWebServer.h"
+#include "ElegantOTA.h"
+//#include <string>
+
 #include "rcm.h" //defines pins
 
 // set up motors and anything else you need here
@@ -29,9 +37,43 @@ uncomment one of the following lines depending on which communication method you
 // See this page for information about how to set up a robot's drivetrain using the JMotor library
 // https://github.com/joshua-8/JMotor/wiki/How-to-set-up-a-drivetrain
 
+String AP_NAME = STRINGIZE(WIFI_NAME);
+String AP_PASSWORD = STRINGIZE(WIFI_PASSWORD);
+
 JMotorDriverEsp32Servo servo1Driver = JMotorDriverEsp32Servo(port1);
 JServoController sC = JServoController(servo1Driver, false, INFINITY, INFINITY, INFINITY );
 float servo1Val = 0;
+
+
+//const char* AP_NAME = "HAL"; const char* AP_PASSWORD = "booboo42";'
+
+AsyncWebServer server(80);
+
+unsigned long ota_progress_millis = 0;
+
+void onOTAStart() {
+    // Log when OTA has started
+    Serial.println("OTA update started!");
+    // <Add your own code here>
+}
+
+void onOTAProgress(size_t current, size_t final) {
+    // Log every 1 second
+    if (millis() - ota_progress_millis > 1000) {
+        ota_progress_millis = millis();
+        Serial.printf("OTA Progress Current: %u bytes, Final: %u bytes\n", current, final);
+    }
+}
+
+void onOTAEnd(bool success) {
+    // Log when OTA has finished
+    if (success) {
+        Serial.println("OTA update finished successfully!");
+    } else {
+        Serial.println("There was an error during OTA update!");
+    }
+    // <Add your own code here>
+}
 
 void Enabled()
 {
@@ -60,7 +102,6 @@ void Disable()
 void PowerOn()
 {
     // runs once on robot startup, set pin modes and use begin() if applicable here
-
 }
 
 void Always()
@@ -73,6 +114,7 @@ void Always()
     #else
     Serial.printf("WIFI_MODE UNDEFINED");
     #endif*/
+    ElegantOTA.loop();
     delay(100);
 }
 
@@ -93,13 +135,14 @@ void WifiDataToSend()
 
 void configWifi()
 {
+    esp_netif_init();
     #ifdef WIFI_MODE
     Serial.printf("WIFI_MODE: %d\n", WIFI_MODE);
     #if WIFI_MODE == WIFI_MODE_JOIN
     Serial.printf("JOINING WIFI NETWORK\n");
     EWD::mode = EWD::Mode::connectToNetwork;
-    EWD::routerName = "HOME-8722";
-    EWD::routerPassword = "LPUndergroundX1";
+    EWD::routerName = AP_NAME.c_str();
+    EWD::routerPassword = AP_PASSWORD.c_str();
     EWD::routerPort = 25210;
     #elif WIFI_MODE == WIFI_MODE_CREATE
     Serial.printf("CREATING WIFI NETWORK\n");
@@ -107,10 +150,34 @@ void configWifi()
     EWD::APName = "rcm0";
     EWD::APPassword = "rcmPassword";
     EWD::APPort = 25210;
+    AP_NAME = "rcm0";
+    AP_PASSWORD = "rcmPassword";
     #else
     Serial.printf("WIFI_MODE UNDEFINED");
     #endif
     #endif
+
+    Serial.printf("WIFI NAME: %s\n", EWD::routerName);
+    Serial.printf("WIFI PW: %s\n", EWD::routerPassword);
+}
+void setupOTA()
+{
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(550);
+        Serial.print(".");
+    }
+
+    server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
+        request->send(200, "text/plain", "Hi! This is ElegantOTA AsyncDemo. Number: 624");
+    });
+    ElegantOTA.begin(&server);    // Start ElegantOTA
+    // ElegantOTA callbacks
+    ElegantOTA.onStart(onOTAStart);
+    ElegantOTA.onProgress(onOTAProgress);
+    ElegantOTA.onEnd(onOTAEnd);
+
+    server.begin();
+    Serial.println("HTTP server started");
 }
 #elif RCM_COMM_METHOD == RCM_COMM_ROS ////////////// ignore everything below this line unless you're using ROS mode/////////////////////////////////////////////
 void ROSWifiSettings()
